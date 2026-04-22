@@ -25,6 +25,8 @@ export function SocialLinksSection({ settings }: SocialLinksSectionProps) {
     settings[`social_${net.id}_url`] && settings[`social_${net.id}_active`] === 'true'
   );
 
+
+  
   if (activeNetworks.length === 0) return null;
 
   return (
