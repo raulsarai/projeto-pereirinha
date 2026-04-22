@@ -251,7 +251,7 @@ export function Hero(props: any) {
                   (LucideIcons as any)[chip.icon] || LucideIcons.CheckCircle;
                 return (
 
-                  //teste
+                  //teste sbdkjsdkjvkhskj
                   <div
                     key={idx}
                     className="flex items-center gap-3 px-4 py-2 rounded-xl border"
