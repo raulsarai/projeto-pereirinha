@@ -217,7 +217,7 @@ export function RegistrationForm() {
     <section id="inscricao" className="bg-primary py-20 text-primary-foreground">
       <div className="mx-auto max-w-4xl px-4">
         <h2 className="mb-4 text-center font-display text-3xl font-bold uppercase tracking-tight md:text-4xl">
-          Ficha de Inscrição
+          Intenção de vaga
         </h2>
         <div className="mx-auto mb-10 h-1 w-16 bg-accent" />
 
