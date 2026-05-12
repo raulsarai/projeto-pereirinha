@@ -11,6 +11,12 @@ import {
   getCategorias,
   getEstatisticas,
   getInstagramPosts,
+  getClassificacao,
+  getClassificacaoEdicoes,
+  getUltimosResultados,
+  getProximosJogos,
+  getCopaAtiva,
+  getCopaBracket,
 } from "@/app/admin/actions";
 import { MessageCircle } from "lucide-react";
 import { FaqSection } from "@/components/faq-section";
@@ -23,14 +29,34 @@ import { ScrollReveal } from "@/components/scroll-reveal";
 import { LeadPopup } from "@/components/lead-popup";
 import { PricingSection } from "@/components/pricing-section";
 import { BookingSection } from "@/components/booking-section";
+import { ClassificacaoSection } from "@/components/classificacao-section";
+import { ResultadosSection } from "@/components/resultados-section";
+import { CopaSection } from "@/components/copa-section";
 
 export default async function Page() {
-  const [settings, categoriasDB, stats, instaPosts] = await Promise.all([
+  const [
+    settings,
+    categoriasDB,
+    stats,
+    instaPosts,
+    classificacao,
+    edicoesClassificacao,
+    ultimosResultados,
+    proximosJogos,
+    copaAtiva,
+  ] = await Promise.all([
     getSiteSettings(),
     getCategorias(),
     getEstatisticas(),
     getInstagramPosts(),
+    getClassificacao("atual"),
+    getClassificacaoEdicoes(),
+    getUltimosResultados(),
+    getProximosJogos(),
+    getCopaAtiva(),
   ]);
+
+  const copaBracket = copaAtiva ? await getCopaBracket(copaAtiva.id) : null;
 
   const categoriasText = categoriasDB
     .filter((c) => c.ativa)
@@ -45,7 +71,8 @@ export default async function Page() {
 
   // Ordem padrão utilizando apenas chaves em inglês para consistência
   const defaultOrder =
-    "info,registration,stats,social,comunicados,cta,faq,testimonials,partners,video,gallery,checkout,pricing,booking";
+    "info,registration,stats,social,comunicados,resultados,cta,faq,testimonials,partners,video,gallery,checkout,pricing,booking,classificacao,copa";
+
   const sectionsOrder = (settings.sections_order || defaultOrder).split(",");
 
   const renderSection = (key: string) => {
@@ -77,12 +104,47 @@ export default async function Page() {
             />
           )
         );
+      case "copa":
+        return (
+          settings.section_copa_active === "true" &&
+          copaAtiva &&
+          copaBracket && (
+            <CopaSection
+              key={key}
+              copaNome={copaAtiva.nome}
+              bracket={copaBracket as any}
+            />
+          )
+        );
+
       case "social":
         return (
           settings.section_social_active === "true" && (
             <SocialLinksSection key={key} settings={settings} />
           )
         );
+      case "resultados":
+        return (
+          settings.section_resultados_active === "true" && (
+            <ResultadosSection
+              key={key}
+              ultimos={ultimosResultados as any}
+              proximos={proximosJogos as any}
+            />
+          )
+        );
+      case "classificacao":
+        return (
+          settings.section_classificacao_active === "true" && (
+            <ClassificacaoSection
+              key={key}
+              edicao={edicoesClassificacao[0] ?? "atual"}
+              edicoes={edicoesClassificacao}
+              items={classificacao as any}
+            />
+          )
+        );
+
       case "comunicados":
         return (
           settings.section_comunicados_active === "true" && (

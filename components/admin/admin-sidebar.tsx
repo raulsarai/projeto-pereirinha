@@ -27,6 +27,9 @@ import {
   CircleDollarSign,
   CalendarCheck,
   ArrowDownUp,
+  TableProperties,
+  Swords,
+  GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -39,6 +42,11 @@ const navItems = [
   { href: "/admin/contador", label: "Contador", icon: Timer },
   { href: "/admin/categorias", label: "Categorias", icon: FolderOpen },
   { href: "/admin/comunicados", label: "Comunicados", icon: Megaphone },
+  // ─── Futebol ───────────────────────────────────────────
+  { href: "/admin/classificacao", label: "Classificação", icon: TableProperties },
+  { href: "/admin/jogos", label: "Jogos", icon: Swords },
+  { href: "/admin/copa", label: "Copa (Chaveamento)", icon: GitBranch },
+  // ───────────────────────────────────────────────────────
   { href: "/admin/configuracoes", label: "Configurações", icon: Sliders },
   { href: "/admin/faq", label: "FAQ", icon: HelpCircle },
   { href: "/admin/depoimentos", label: "Depoimentos", icon: Quote },
@@ -69,7 +77,6 @@ export function AdminSidebar() {
 
   useEffect(() => {
     fetchCount();
-    // Verifica novos leads a cada 30 segundos
     const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -112,7 +119,7 @@ export function AdminSidebar() {
               item.href === "/admin"
                 ? pathname === "/admin"
                 : pathname.startsWith(item.href);
-            
+
             return (
               <li key={item.href} className="relative">
                 <Link
@@ -125,16 +132,26 @@ export function AdminSidebar() {
                   )}
                   title={collapsed ? item.label : undefined}
                 >
-                  <item.icon className={cn("h-5 w-5 shrink-0 transition-transform group-hover:scale-110", isActive && "text-accent-foreground")} />
-                  
-                  {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5 shrink-0 transition-transform group-hover:scale-110",
+                      isActive && "text-accent-foreground",
+                    )}
+                  />
 
-                  {/* Badge de Notificação Integrado */}
+                  {!collapsed && (
+                    <span className="flex-1 truncate">{item.label}</span>
+                  )}
+
                   {item.showBadge && unreadCount > 0 && (
-                    <span className={cn(
-                      "flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white animate-pulse shadow-lg shadow-red-500/20",
-                      collapsed ? "absolute -top-1 -right-1 border-2 border-card" : "ml-auto"
-                    )}>
+                    <span
+                      className={cn(
+                        "flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white animate-pulse shadow-lg shadow-red-500/20",
+                        collapsed
+                          ? "absolute -top-1 -right-1 border-2 border-card"
+                          : "ml-auto",
+                      )}
+                    >
                       {unreadCount}
                     </span>
                   )}
@@ -169,7 +186,9 @@ export function AdminSidebar() {
           ) : (
             <div className="flex items-center gap-2">
               <ChevronLeft className="h-5 w-5" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Recolher</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest">
+                Recolher
+              </span>
             </div>
           )}
         </Button>

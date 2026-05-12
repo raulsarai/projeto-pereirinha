@@ -380,3 +380,438 @@ export async function updateSettingMedia(formData: FormData, chave: string) {
   await updateSiteSetting(chave, publicUrl)
   return { success: true, url: publicUrl }
 }
+
+// TYPES AUXILIARES
+export type TimeRow = {
+  id: string
+  nome: string
+  escudo_url: string | null
+  cor_primaria: string | null
+  ativo: boolean | null
+}
+
+export type ClassificacaoRow = {
+  id?: string
+  time_id: string
+  edicao: string
+  posicao: number
+  pontos: number
+  jogos: number
+  vitorias: number
+  empates: number
+  derrotas: number
+  gols_pro: number
+  gols_contra: number
+}
+
+// --- TIMES ---
+export async function getTimes(): Promise<TimeRow[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('times')
+    .select('*')
+    .order('nome', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data as TimeRow[]) ?? []
+}
+
+export async function createTime(formData: FormData) {
+  const supabase = await createClient()
+
+  const nome = formData.get('nome') as string
+  const cor = (formData.get('cor_primaria') as string) || null
+  const escudo = formData.get('escudo') as File | null
+
+  let escudoPath: string | null = null
+  if (escudo && escudo.size > 0) {
+    const ext = escudo.name.split('.').pop()
+    const fileName = `times/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { data, error: uploadError } = await supabase
+      .storage
+      .from('imagens-publicas')
+      .upload(fileName, escudo)
+
+    if (uploadError) throw new Error(uploadError.message)
+    escudoPath = data?.path ?? null
+  }
+
+  const { error } = await supabase.from('times').insert({
+    nome,
+    cor_primaria: cor,
+    escudo_url: escudoPath,
+    ativo: true,
+  })
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function updateTime(id: string, formData: FormData) {
+  const supabase = await createClient()
+
+  const nome = formData.get('nome') as string
+  const cor = (formData.get('cor_primaria') as string) || null
+  const ativo = formData.get('ativo') === 'on'
+  const escudo = formData.get('escudo') as File | null
+
+  const updates: Record<string, unknown> = {
+    nome,
+    cor_primaria: cor,
+    ativo,
+  }
+
+  if (escudo && escudo.size > 0) {
+    const ext = escudo.name.split('.').pop()
+    const fileName = `times/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { data, error: uploadError } = await supabase
+      .storage
+      .from('imagens-publicas')
+      .upload(fileName, escudo)
+    if (uploadError) throw new Error(uploadError.message)
+    updates.escudo_url = data?.path ?? null
+  }
+
+  const { error } = await supabase
+    .from('times')
+    .update(updates)
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function toggleTimeAtivo(id: string, ativo: boolean) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('times')
+    .update({ ativo })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+}
+
+export async function deleteTime(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('times').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+}
+
+// --- CLASSIFICACAO ---
+export async function getClassificacao(edicao = 'atual') {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('classificacao')
+    .select(
+      `*,
+       times:time_id (id, nome, escudo_url, cor_primaria)`
+    )
+    .eq('edicao', edicao)
+    .order('posicao', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export async function getClassificacaoEdicoes() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('classificacao')
+    .select('edicao')
+    .order('edicao', { ascending: false })
+    .neq('edicao', '')
+
+  if (error) throw new Error(error.message)
+  const uniq = Array.from(new Set((data ?? []).map((d) => d.edicao as string)))
+  return uniq
+}
+
+export async function upsertClassificacao(rows: ClassificacaoRow[]) {
+  const supabase = await createClient()
+
+  const payload = rows.map((row) => ({
+    ...row,
+    posicao: Number(row.posicao),
+    pontos: Number(row.pontos),
+    jogos: Number(row.jogos),
+    vitorias: Number(row.vitorias),
+    empates: Number(row.empates),
+    derrotas: Number(row.derrotas),
+    gols_pro: Number(row.gols_pro),
+    gols_contra: Number(row.gols_contra),
+  }))
+
+  const { error } = await supabase.from('classificacao').upsert(payload, {
+    onConflict: 'time_id,edicao',
+  })
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function deleteClassificacaoRow(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('classificacao').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/classificacao')
+  revalidatePath('/')
+}
+
+export type JogoRow = {
+  id: string
+  time_casa_id: string
+  time_visitante_id: string
+  data_hora: string
+  local: string | null
+  rodada: string | null
+  edicao: string | null
+  gols_casa: number | null
+  gols_visitante: number | null
+  status: 'agendado' | 'ao_vivo' | 'encerrado' | 'cancelado'
+  destaque: boolean | null
+}
+
+export async function getUltimosResultados(limit = 6) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('jogos')
+    .select(
+      `*,
+       time_casa:time_casa_id (id, nome, escudo_url, cor_primaria),
+       time_visitante:time_visitante_id (id, nome, escudo_url, cor_primaria)`
+    )
+    .eq('status', 'encerrado')
+    .eq('destaque', true)
+    .order('data_hora', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export async function getProximosJogos(limit = 6) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('jogos')
+    .select(
+      `*,
+       time_casa:time_casa_id (id, nome, escudo_url, cor_primaria),
+       time_visitante:time_visitante_id (id, nome, escudo_url, cor_primaria)`
+    )
+    .eq('status', 'agendado')
+    .eq('destaque', true)
+    .order('data_hora', { ascending: true })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export async function getJogos(status?: string) {
+  const supabase = await createClient()
+  let query = supabase
+    .from('jogos')
+    .select(
+      `*,
+       time_casa:time_casa_id (id, nome, escudo_url),
+       time_visitante:time_visitante_id (id, nome, escudo_url)`
+    )
+    .order('data_hora', { ascending: false })
+
+  if (status && status !== 'todos') {
+    query = query.eq('status', status)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export async function createJogo(formData: FormData) {
+  const supabase = await createClient()
+  const payload: Partial<JogoRow> = {
+    time_casa_id: formData.get('time_casa_id') as string,
+    time_visitante_id: formData.get('time_visitante_id') as string,
+    data_hora: formData.get('data_hora') as string,
+    local: (formData.get('local') as string) || null,
+    rodada: (formData.get('rodada') as string) || null,
+    edicao: (formData.get('edicao') as string) || 'atual',
+    status: (formData.get('status') as any) || 'agendado',
+    destaque: formData.get('destaque') === 'on',
+  }
+
+  const { error } = await supabase.from('jogos').insert(payload)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/jogos')
+  revalidatePath('/')
+}
+
+export async function updateJogo(id: string, formData: FormData) {
+  const supabase = await createClient()
+  const payload: Partial<JogoRow> = {
+    local: (formData.get('local') as string) || null,
+    rodada: (formData.get('rodada') as string) || null,
+    edicao: (formData.get('edicao') as string) || 'atual',
+    status: (formData.get('status') as any) || 'agendado',
+    destaque: formData.get('destaque') === 'on',
+  }
+  const { error } = await supabase
+    .from('jogos')
+    .update(payload)
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/jogos')
+  revalidatePath('/')
+}
+
+export async function encerrarJogo(
+  id: string,
+  gols_casa: number,
+  gols_visitante: number,
+) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('jogos')
+    .update({
+      gols_casa,
+      gols_visitante,
+      status: 'encerrado',
+    })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/jogos')
+  revalidatePath('/')
+}
+
+export async function deleteJogo(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('jogos').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/jogos')
+  revalidatePath('/')
+}
+
+export async function getCopas() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('copas')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+export async function getCopaAtiva() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('copas')
+    .select('*')
+    .eq('ativa', true)
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message)
+  return data ?? null
+}
+
+export async function setCopaAtiva(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('set_copa_ativa', { p_copa_id: id })
+  // Se preferir sem RPC: duas queries UPDATE
+  if (error) throw new Error(error.message)
+  revalidatePath('/admin/copa')
+  revalidatePath('/')
+}
+
+export async function createCopa(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const nome = formData.get("nome") as string;
+  const edicao = formData.get("edicao") as string;
+
+  await supabase.from("copas").insert({ nome, edicao, ativa: false });
+  revalidatePath("/admin/copa");
+}
+
+export async function getCopaBracket(copaId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('copa_confrontos')
+    .select(
+      `*,
+       time_a:time_a_id (id, nome, escudo_url),
+       time_b:time_b_id (id, nome, escudo_url)`
+    )
+    .eq('copa_id', copaId)
+    .order('fase', { ascending: true })
+    .order('ordem', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  const fasesOrdenadas = ['oitavas', 'quartas', 'semifinal', 'final', 'terceiro_lugar']
+
+  const grouped: Record<string, any[]> = {}
+  for (const fase of fasesOrdenadas) {
+    grouped[fase] = (data ?? []).filter((c) => c.fase === fase)
+  }
+
+  return grouped
+}
+
+export async function updateConfrontoCopa(
+  id: string,
+  gols_a: number,
+  gols_b: number,
+  penaltis_a?: number,
+  penaltis_b?: number,
+) {
+  const supabase = await createClient()
+
+  const { data: confronto, error: getErr } = await supabase
+    .from('copa_confrontos')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (getErr) throw new Error(getErr.message)
+
+  let vencedor_id: string | null = null
+
+  if (gols_a > gols_b) vencedor_id = confronto.time_a_id
+  if (gols_b > gols_a) vencedor_id = confronto.time_b_id
+  if (gols_a === gols_b && penaltis_a != null && penaltis_b != null) {
+    if (penaltis_a > penaltis_b) vencedor_id = confronto.time_a_id
+    if (penaltis_b > penaltis_a) vencedor_id = confronto.time_b_id
+  }
+
+  const { error } = await supabase
+    .from('copa_confrontos')
+    .update({
+      gols_a,
+      gols_b,
+      penaltis_a: penaltis_a ?? null,
+      penaltis_b: penaltis_b ?? null,
+      vencedor_id,
+      status: 'encerrado',
+    })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+
+  // V1: sem progressão automática para manter simples
+  revalidatePath('/admin/copa')
+  revalidatePath('/')
+}
+
+
